@@ -16,6 +16,16 @@ export interface AlignmentResult {
   algorithm: string;
 }
 
+export interface AlignmentHistoryItem {
+  id: string;
+  seq1Id: string;
+  seq2Id: string;
+  seq1Name: string;
+  seq2Name: string;
+  result: AlignmentResult;
+  createdAt: number;
+}
+
 export interface PhyloNode {
   name: string;
   branchLength: number;

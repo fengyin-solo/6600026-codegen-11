@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useSequenceStore } from './store/sequence';
 import AlignmentView from './components/AlignmentView.vue';
 import PhyloTree from './components/PhyloTree.vue';
@@ -19,6 +19,22 @@ onMounted(() => {
   }
 });
 
+const comparisonCardGridClass = computed(() => {
+  const count = store.alignmentHistory.length;
+  if (count <= 1) return 'grid-cols-1';
+  if (count === 2) return 'grid-cols-1 xl:grid-cols-2';
+  if (count === 3) return 'grid-cols-1 2xl:grid-cols-3';
+  return 'grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3';
+});
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
 function handleRunAlignment() {
   if (!store.selectedSeq1 || !store.selectedSeq2) return;
   if (store.selectedSeq1 === store.selectedSeq2) {
@@ -26,6 +42,17 @@ function handleRunAlignment() {
     return;
   }
   store.runAlignment(store.selectedSeq1, store.selectedSeq2, store.currentAlgorithm);
+}
+
+function handleRemoveHistory(id: string) {
+  store.removeAlignmentHistory(id);
+}
+
+function handleClearHistory() {
+  if (store.alignmentHistory.length === 0) return;
+  if (confirm('确定要清空所有比对历史记录吗？')) {
+    store.clearAlignmentHistory();
+  }
 }
 
 function handleAnalyzeGC() {
@@ -150,8 +177,20 @@ function handleLoadMock() {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Alignment Section -->
         <section class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-          <div class="px-4 py-2 bg-gray-800 border-b border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-300">序列比对</h2>
+          <div class="px-4 py-2 bg-gray-800 border-b border-gray-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <h2 class="text-sm font-semibold text-gray-300">序列比对 · 多组对照</h2>
+              <span class="text-xs px-2 py-0.5 bg-gray-700 rounded-full text-cyan-400">
+                已保存 {{ store.alignmentHistory.length }} 组
+              </span>
+            </div>
+            <button
+              v-if="store.alignmentHistory.length > 0"
+              @click="handleClearHistory"
+              class="text-xs px-2.5 py-1 bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white rounded transition-colors"
+            >
+              清空全部
+            </button>
           </div>
           <div class="p-4 space-y-3">
             <!-- Controls -->
@@ -182,7 +221,7 @@ function handleLoadMock() {
               </div>
             </div>
 
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-4">
               <label class="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" v-model="store.currentAlgorithm" value="nw" class="accent-emerald-500" />
                 <span class="text-gray-300">Needleman-Wunsch (全局)</span>
@@ -193,14 +232,52 @@ function handleLoadMock() {
               </label>
               <button
                 @click="handleRunAlignment"
-                class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded transition-colors ml-auto"
+                class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded transition-colors ml-auto flex items-center gap-1.5"
               >
-                运行比对
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                运行并保存比对
               </button>
             </div>
 
-            <!-- Alignment Result -->
-            <AlignmentView :result="store.alignmentResult" />
+            <!-- Alignment History Comparison -->
+            <div class="border-t border-gray-700 pt-3 mt-3">
+              <div v-if="store.alignmentHistory.length === 0" class="flex flex-col items-center justify-center py-10 text-gray-500 text-sm bg-gray-900 rounded-lg border-2 border-dashed border-gray-700">
+                <svg class="w-10 h-10 mb-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                <p class="text-gray-400">尚未保存任何比对结果</p>
+                <p class="text-gray-600 text-xs mt-1">选择序列组合并点击「运行并保存比对」，多组结果将并排展示以便比较</p>
+              </div>
+
+              <div v-else class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-gray-500 flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    并排比较不同样本组合的差异 · 可单独移除不需要的比对
+                  </div>
+                </div>
+
+                <div :class="['grid gap-3', comparisonCardGridClass]">
+                  <div
+                    v-for="(item, index) in store.alignmentHistory"
+                    :key="item.id"
+                    class="min-w-0"
+                  >
+                    <AlignmentView
+                      :result="item.result"
+                      :title="`#${index + 1} [${formatTime(item.createdAt)}] ${item.seq1Name.split(' ')[0]} ↔ ${item.seq2Name.split(' ')[0]}`"
+                      :show-remove="true"
+                      :show-empty-state="false"
+                      @remove="handleRemoveHistory(item.id)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

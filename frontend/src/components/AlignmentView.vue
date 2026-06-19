@@ -2,8 +2,19 @@
 import { ref, onMounted, watch, nextTick } from 'vue';
 import type { AlignmentResult } from '../types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   result: AlignmentResult | null;
+  title?: string;
+  showRemove?: boolean;
+  showEmptyState?: boolean;
+}>(), {
+  title: '',
+  showRemove: false,
+  showEmptyState: true
+});
+
+const emit = defineEmits<{
+  (e: 'remove'): void;
 }>();
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -35,14 +46,12 @@ function drawAlignment() {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Background
   ctx.fillStyle = '#111827';
   ctx.fillRect(0, 0, width, height);
 
   ctx.font = '11px monospace';
   ctx.textAlign = 'center';
 
-  // Draw sequence 1
   const y1 = 20;
   for (let i = 0; i < len; i++) {
     const x = padding + i * cellWidth;
@@ -53,7 +62,6 @@ function drawAlignment() {
     ctx.fillText(base, x + cellWidth / 2, y1 + 6);
   }
 
-  // Draw match indicators
   const yMid = 50;
   ctx.font = '10px monospace';
   for (let i = 0; i < len; i++) {
@@ -72,7 +80,6 @@ function drawAlignment() {
     }
   }
 
-  // Draw sequence 2
   const y2 = 65;
   for (let i = 0; i < len; i++) {
     const x = padding + i * cellWidth;
@@ -94,34 +101,44 @@ watch(() => props.result, () => {
 </script>
 
 <template>
-  <div class="bg-gray-900 rounded-lg overflow-hidden">
-    <div v-if="result" class="space-y-3">
-      <!-- Stats -->
-      <div class="flex items-center gap-4 px-4 py-2 bg-gray-800 text-sm">
+  <div class="bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
+    <div v-if="result" class="space-y-2">
+      <div v-if="title || showRemove" class="flex items-center justify-between px-3 py-1.5 bg-gray-800 border-b border-gray-700">
+        <div class="text-xs font-medium text-cyan-400 truncate flex-1 mr-2">{{ title }}</div>
+        <button
+          v-if="showRemove"
+          @click="emit('remove')"
+          class="text-gray-500 hover:text-red-400 transition-colors text-xs px-1.5 py-0.5 rounded hover:bg-gray-700"
+          title="移除此比对"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 bg-gray-850 text-xs" style="background-color: #1a2234;">
         <span class="text-gray-400">算法: <span class="text-cyan-400">{{ result.algorithm }}</span></span>
         <span class="text-gray-400">得分: <span class="text-yellow-400 font-bold">{{ result.score }}</span></span>
         <span class="text-gray-400">一致性: <span class="text-green-400 font-bold">{{ result.identity }}%</span></span>
         <span class="text-gray-400">缺口: <span class="text-red-400">{{ result.gaps }}</span></span>
+        <span class="text-gray-400">长度: <span class="text-purple-400">{{ result.aligned1.length }} bp</span></span>
       </div>
 
-      <!-- Legend -->
-      <div class="flex items-center gap-3 px-4 text-xs text-gray-500">
+      <div class="flex flex-wrap items-center gap-3 px-3 text-xs text-gray-500">
         <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#22c55e"></span> A</span>
         <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#ef4444"></span> T</span>
         <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#3b82f6"></span> G</span>
         <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#eab308"></span> C</span>
         <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#4b5563"></span> Gap</span>
-        <span class="ml-2 text-green-500">| 匹配</span>
+        <span class="ml-1 text-green-500">| 匹配</span>
         <span class="text-red-500">X 错配</span>
       </div>
 
-      <!-- Canvas -->
-      <div ref="scrollContainer" class="overflow-x-auto px-4 pb-3">
+      <div ref="scrollContainer" class="overflow-x-auto px-3 pb-2">
         <canvas ref="canvasRef" class="block"></canvas>
       </div>
     </div>
 
-    <div v-else class="flex items-center justify-center py-12 text-gray-600 text-sm">
+    <div v-else-if="showEmptyState" class="flex items-center justify-center py-12 text-gray-600 text-sm">
       请选择两个序列并运行比对以查看结果
     </div>
   </div>

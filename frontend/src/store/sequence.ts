@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Sequence, AlignmentResult, GCContent, PhyloNode } from '../types';
+import type { Sequence, AlignmentResult, GCContent, PhyloNode, AlignmentHistoryItem } from '../types';
 import {
   needlemanWunsch,
   smithWaterman,
@@ -13,6 +13,7 @@ import {
 export const useSequenceStore = defineStore('sequence', () => {
   const sequences = ref<Sequence[]>([]);
   const alignmentResult = ref<AlignmentResult | null>(null);
+  const alignmentHistory = ref<AlignmentHistoryItem[]>([]);
   const currentAlgorithm = ref<'nw' | 'sw'>('nw');
   const gcData = ref<GCContent[]>([]);
   const phyloTree = ref<PhyloNode | null>(null);
@@ -48,11 +49,34 @@ export const useSequenceStore = defineStore('sequence', () => {
 
     currentAlgorithm.value = algorithm;
 
+    let result: AlignmentResult;
     if (algorithm === 'nw') {
-      alignmentResult.value = needlemanWunsch(s1.data, s2.data);
+      result = needlemanWunsch(s1.data, s2.data);
     } else {
-      alignmentResult.value = smithWaterman(s1.data, s2.data);
+      result = smithWaterman(s1.data, s2.data);
     }
+
+    alignmentResult.value = result;
+
+    const historyItem: AlignmentHistoryItem = {
+      id: 'align-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8),
+      seq1Id: s1.id,
+      seq2Id: s2.id,
+      seq1Name: s1.name,
+      seq2Name: s2.name,
+      result,
+      createdAt: Date.now()
+    };
+    alignmentHistory.value.push(historyItem);
+  }
+
+  function removeAlignmentHistory(id: string) {
+    alignmentHistory.value = alignmentHistory.value.filter(item => item.id !== id);
+  }
+
+  function clearAlignmentHistory() {
+    alignmentHistory.value = [];
+    alignmentResult.value = null;
   }
 
   function loadMockSequences() {
@@ -82,6 +106,7 @@ export const useSequenceStore = defineStore('sequence', () => {
   return {
     sequences,
     alignmentResult,
+    alignmentHistory,
     currentAlgorithm,
     gcData,
     phyloTree,
@@ -92,6 +117,8 @@ export const useSequenceStore = defineStore('sequence', () => {
     addSequence,
     removeSequence,
     runAlignment,
+    removeAlignmentHistory,
+    clearAlignmentHistory,
     loadMockSequences,
     buildTree,
     analyzeGC
